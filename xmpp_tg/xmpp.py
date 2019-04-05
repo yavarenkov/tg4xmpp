@@ -204,7 +204,7 @@ class XMPPTelegram(ComponentXMPP):
         jid = event['from'].bare
         to = event['to'].bare
                         
-        # maybe if i'll ignore it — it will go ahead
+        # maybe if i'll ignore it - it will go ahead
         if to != self.boundjid.bare:
             return
 
@@ -787,8 +787,8 @@ class XMPPTelegram(ComponentXMPP):
 
         # edit this message 
         pattern = message.split('/')
-        replace = ' ' if pattern[2] == '' else '/'.join(pattern[2:]) # no empty regexp — replace with whitespace
-        edited = re.sub(r'%s' % pattern[1], replace, msg_body, re.I) if pattern[1] != '' else replace # if no pattern specified — edit whole message
+        replace = ' ' if pattern[2] == '' else '/'.join(pattern[2:]) # no empty regexp - replace with whitespace
+        edited = re.sub(r'%s' % pattern[1], replace, msg_body, re.I) if pattern[1] != '' else replace # if no pattern specified - edit whole message
         
         return (msg_id, edited)
 
