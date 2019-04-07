@@ -22,6 +22,7 @@ CONFIG = {
     #'tg_server_dc': 2,
 
     'db_connect': os.getenv('DB_CONNECT', 'db.sqlite'),
+    'persistence_path': os.getenv('TG_SESSIONS', '/var/tg4xmpp/session'),
 
     'media_external_formats': os.getenv('MEDIA_EXTERNAL_FORMATS', 'png|jpg|jpeg|gif|mp3|mp4|ogg'),
 

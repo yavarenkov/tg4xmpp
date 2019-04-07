@@ -1,8 +1,10 @@
 import re, sys, os, io, sqlite3, hashlib, time, datetime
 import xml.etree.ElementTree as ET
+from os import path
 
 from sleekxmpp.componentxmpp import ComponentXMPP
 from sleekxmpp import Presence, Message
+from telethon.tl import Session
 
 from telethon.tl.functions.messages import GetDialogsRequest, SendMessageRequest, SendMediaRequest, EditMessageRequest, DeleteMessagesRequest, ImportChatInviteRequest, GetFullChatRequest, AddChatUserRequest, DeleteChatUserRequest, CreateChatRequest, DeleteHistoryRequest
 from telethon.tl.functions.account import UpdateStatusRequest, GetAuthorizationsRequest, UpdateProfileRequest, UpdateUsernameRequest
@@ -23,6 +25,20 @@ from telethon.errors import SessionPasswordNeededError
 from xmpp_tg.mtproto import TelegramGateClient
 from xmpp_tg.utils import var_dump, display_tg_name, get_contact_jid, localtime
 import xmpp_tg.monkey  # monkeypatch
+
+
+class TelethonSession(Session):
+    def __init__(self, session_user_id, persistence_path=None):
+        self.persistence_path = persistence_path
+        super(TelethonSession, self).__init__(session_user_id)
+
+    def save(self):
+        sid = self.session_user_id
+        self.session_user_id = path.join(self.persistence_path, self.session_user_id)
+        super(TelethonSession, self).save()
+        self.session_user_id = sid
+
+
 
 class XMPPTelegram(ComponentXMPP):
     """
@@ -549,7 +565,8 @@ class XMPPTelegram(ComponentXMPP):
         :param phone:
         :return:
         """
-        client = TelegramGateClient('a_'+phone, int(self.config['tg_api_id']), self.config['tg_api_hash'], self, jid, phone)
+        session = TelethonSession('a_'+phone, self.config['persistence_path'])
+        client = TelegramGateClient(session, int(self.config['tg_api_id']), self.config['tg_api_hash'], self, jid, phone)
         if 'tg_server_ip' in self.config and 'tg_server_dc' in self.config and 'tg_server_port' in self.config:
             client.session.set_dc(self.config['tg_server_dc'], self.config['tg_server_ip'], self.config['tg_server_port'])
         client.connect()

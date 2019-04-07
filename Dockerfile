@@ -7,4 +7,6 @@ COPY . .
 RUN pip3 install -e .
 
 VOLUME /app/data
+
+ENV LANG=C.UTF-8
 CMD PYTHONPATH=. tg4xmpp config_example
