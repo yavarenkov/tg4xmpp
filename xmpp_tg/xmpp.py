@@ -28,16 +28,20 @@ import xmpp_tg.monkey  # monkeypatch
 
 
 class TelethonSession(Session):
-    def __init__(self, session_user_id, persistence_path=None):
-        self.persistence_path = persistence_path
-        super(TelethonSession, self).__init__(session_user_id)
-
     def save(self):
         sid = self.session_user_id
         self.session_user_id = path.join(self.persistence_path, self.session_user_id)
         super(TelethonSession, self).save()
         self.session_user_id = sid
 
+    @staticmethod
+    def try_load_or_create_new(session_user_id, persistence_path=None):
+        sid = session_user_id
+        s = Session.try_load_or_create_new(path.join(persistence_path, session_user_id))
+        s.session_user_id = sid
+        s.persistence_path = persistence_path
+        s.save = TelethonSession.save
+        return s
 
 
 class XMPPTelegram(ComponentXMPP):
@@ -77,15 +81,13 @@ class XMPPTelegram(ComponentXMPP):
         self.add_event_handler('got_online', self.handle_online)
         self.add_event_handler('got_offline', self.handle_offline)
         self.add_event_handler('session_start', self.handle_start)
-        
 
         self.plugin['xep_0030'].add_identity(
             category='gateway',
             itype='telegram',
             name=self.config['title'],
             node=self.boundjid.node,
-            jid=self.boundjid.bare,
-            lang='no'
+            jid=self.boundjid.bare
         )
 
         vcard = self.plugin['xep_0054'].make_vcard()
@@ -565,7 +567,7 @@ class XMPPTelegram(ComponentXMPP):
         :param phone:
         :return:
         """
-        session = TelethonSession('a_'+phone, self.config['persistence_path'])
+        session = TelethonSession.try_load_or_create_new('a_'+phone, self.config['persistence_path'])
         client = TelegramGateClient(session, int(self.config['tg_api_id']), self.config['tg_api_hash'], self, jid, phone)
         if 'tg_server_ip' in self.config and 'tg_server_dc' in self.config and 'tg_server_port' in self.config:
             client.session.set_dc(self.config['tg_server_dc'], self.config['tg_server_ip'], self.config['tg_server_port'])

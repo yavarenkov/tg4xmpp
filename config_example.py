@@ -2,7 +2,7 @@
 import os
 
 CONFIG = {
-    'title': 'XMPP <-> Telegram Gate',
+    'title': 'Telegram',
 
     'debug': bool(int(os.getenv('DEBUG', 0))),
     'logfile': '/dev/null',

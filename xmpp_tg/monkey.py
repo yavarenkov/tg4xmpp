@@ -1,10 +1,14 @@
+import logging
+
 from sleekxmpp.plugins.xep_0054 import XEP_0054
 from sleekxmpp.plugins.xep_0030 import XEP_0030
 from sleekxmpp import Iq
 from sleekxmpp.xmlstream import JID
 from sleekxmpp.exceptions import XMPPError
-
 from telethon.update_state import UpdateState
+
+log = logging.getLogger(__name__)
+
 
 def patched_handle_get_vcard(self, iq):
     if iq['type'] == 'result':
