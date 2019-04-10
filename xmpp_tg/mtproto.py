@@ -1,3 +1,4 @@
+import cachetools as cachetools
 from telethon import TelegramClient
 from telethon.utils import get_extension
 from telethon.tl.types import UpdateShortMessage, UpdateShortChatMessage, UpdateEditMessage, UpdateDeleteMessages, \
@@ -51,6 +52,7 @@ class TelegramGateClient(TelegramClient):
         self._message_cache_supergroups = dict()
         
         self._del_pts = 0
+        self.xmpp_message_ids = cachetools.TTLCache(maxsize=256000, ttl=24 * 60 * 60)
         
 
     def xmpp_update_handler(self, obj):
@@ -78,7 +80,7 @@ class TelegramGateClient(TelegramClient):
             if type(obj) in [UpdateShortMessage] and not obj.out:
 
                fwd_from = self._process_forward_msg(obj) if obj.fwd_from else '' # process forward messages 
-               self.gate_send_message( mfrom='u' + str(obj.user_id), mbody = '{}{}'.format(fwd_from, obj.message) )
+               self.gate_send_message( mfrom='u' + str(obj.user_id), mbody = '{}{}'.format(fwd_from, obj.message), tg_msg=obj)
                usr = self._get_user_information(obj.user_id) # get peer information
                self.invoke(ReadHistoryRequest( InputPeerUser(usr.id, usr.access_hash), obj.id )) # delivery report
                
@@ -89,7 +91,7 @@ class TelegramGateClient(TelegramClient):
                nickname = display_tg_name(usr)
                
                # send message 
-               self.gate_send_message(mfrom='g' + str(obj.chat_id), mbody ='[User: {}] {}{}'.format(nickname, fwd_from, obj.message) )
+               self.gate_send_message(mfrom='g' + str(obj.chat_id), mbody ='[{}] {}{}'.format(nickname, fwd_from, obj.message), tg_msg=obj)
                self.invoke(ReadHistoryRequest(InputPeerChat(obj.chat_id), obj.id))
                
              
@@ -144,7 +146,7 @@ class TelegramGateClient(TelegramClient):
                if not is_user and not obj.message.post: 
                   usr = self._get_user_information(obj.message.from_id)
                   nickname = display_tg_name(usr)
-                  msg = '[User: {}] {}'.format(nickname, msg) 
+                  msg = '[{}] {}'.format(nickname, msg)
 
                   
                # message media #
@@ -152,11 +154,12 @@ class TelegramGateClient(TelegramClient):
                   msg = '{} {}'.format( msg, self._process_media_msg(obj.message.media) ) 
                   
                # edited #
-               if obj.message.edit_date:
-                  msg = '[Edited] {}'.format(msg)
-               
+               replace_id = None
+               if obj.message.edit_date:  # UpdateEditMessage
+                  replace_id = self.xmpp_message_ids.get(self.tg_msg_uid(obj.message))
+
                # send message #   
-               self.gate_send_message(prefix + str(cid), mbody = '[MSG {}] {}{}'.format(mid, fwd_from, msg) )
+               self.gate_send_message(prefix + str(cid), mbody = '{}{}'.format(fwd_from, msg), replace_id=replace_id )
                
                # delivery report
                if is_supergroup:
@@ -182,12 +185,30 @@ class TelegramGateClient(TelegramClient):
             print('Exception occurs!')
             print(traceback.format_exc())
 
-    def gate_send_message(self, mfrom, mbody):
+    def tg_msg_uid(self, tg_msg):
+        if hasattr(tg_msg, 'user_id'):
+            from_id = tg_msg.user_id
+        elif hasattr(tg_msg, 'from_id'):
+            from_id = tg_msg.from_id
+        else:
+            raise AttributeError('tg_msg does not have a from_id or user_id')
+
+        return '%d_%d' % (from_id, tg_msg.id)
+
+    def gate_send_message(self, mfrom, mbody, replace_id=None, tg_msg=None):
         tg_from = int(mfrom[1:]) 
         if not tg_from in self.xmpp_gate.tg_dialogs[self.jid]['users'] and not tg_from in self.xmpp_gate.tg_dialogs[self.jid]['groups'] and not tg_from in self.xmpp_gate.tg_dialogs[self.jid]['supergroups']: # new contact appeared
            self.xmpp_gate.tg_process_dialogs( self.jid )
 
-        self.xmpp_gate.send_message( mto=self.jid, mfrom=mfrom + '@' + self.xmpp_gate.config['jid'], mtype='chat', mbody=mbody)
+        msg = self.xmpp_gate.make_message(mto=self.jid, mfrom=mfrom + '@' + self.xmpp_gate.config['jid'], mtype='chat', mbody=mbody)
+
+        if replace_id:
+            msg['replace']['id'] = replace_id
+
+        msg.send()
+
+        if tg_msg:
+            self.xmpp_message_ids[self.tg_msg_uid(tg_msg)] = msg['id']
 
     def generate_media_link(self, media):
         """

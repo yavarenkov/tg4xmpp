@@ -7,6 +7,7 @@ setup(
     install_requires=[
         'sleekxmpp==1.3.2',
         'Telethon==0.15.5',
+        'cachetools',
         'pytz',
     ],
     entry_points='''

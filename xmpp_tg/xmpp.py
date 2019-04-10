@@ -73,6 +73,7 @@ class XMPPTelegram(ComponentXMPP):
         self.register_plugin('xep_0030')  # Service discovery
         self.register_plugin('xep_0054')  # VCard-temp
         self.register_plugin('xep_0172')  # NickNames
+        self.register_plugin('xep_0308')  # Last Message Correction
 
         self.add_event_handler('message', self.message)
         self.add_event_handler('presence_unsubscribe', self.event_presence_unsub)
