@@ -5,6 +5,7 @@ from base64 import b64decode
 from os import path
 from os.path import isfile
 
+import cachetools
 from sleekxmpp.componentxmpp import ComponentXMPP
 from sleekxmpp import Presence, Message
 from telethon.tl import Session
@@ -101,6 +102,7 @@ class XMPPTelegram(ComponentXMPP):
         self.tg_dialogs = dict()
         self.contact_list = dict()
 
+        self.tg_message_ids = cachetools.TTLCache(maxsize=256000, ttl=24 * 60 * 60)
         self.db_connection = self.init_database()
 
         self.register_plugin('xep_0030')  # Service discovery
@@ -193,7 +195,13 @@ class XMPPTelegram(ComponentXMPP):
                         
                     # peer OK. 
                     if tg_peer:
-                        result = None 
+                        result = None
+
+                        if iq['replace']['id'] in self.tg_message_ids:
+                            tg_id, tg_old_msg_id = map(int, self.tg_message_ids[iq['replace']['id']].split('_', maxsplit=1))
+                            self.tg_connections[jid].invoke(EditMessageRequest(tg_peer, tg_old_msg_id, message=msg))
+                            self.tg_message_ids[iq['id']] = '%d_%d' % (tg_id, tg_old_msg_id)
+                            return
                         
                         # detect media
                         if msg.startswith('http') and re.match(r'(?:http\:|https\:)?\/\/.*\.(?:' + self.config['media_external_formats'] + ')', msg):
@@ -213,6 +221,7 @@ class XMPPTelegram(ComponentXMPP):
                         if result and hasattr(result, 'id'):  # update id 
                             msg_id = result.id
                             self.tg_dialogs[jid]['messages'][tg_id] = {'id': msg_id, 'body': msg}
+                            self.tg_message_ids[iq['id']] = '%d_%d' % (tg_id, msg_id)
                             #self.send_message(mto=iq['from'], mfrom=iq['to'], mtype='chat', mbody='[Your MID:{}]'.format(msg_id))
 
 
