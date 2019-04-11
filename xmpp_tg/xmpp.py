@@ -1,10 +1,14 @@
+import json
 import re, sys, os, io, sqlite3, hashlib, time, datetime
 import xml.etree.ElementTree as ET
+from base64 import b64decode
 from os import path
+from os.path import isfile
 
 from sleekxmpp.componentxmpp import ComponentXMPP
 from sleekxmpp import Presence, Message
 from telethon.tl import Session
+from telethon.tl.entity_database import EntityDatabase
 
 from telethon.tl.functions.messages import GetDialogsRequest, SendMessageRequest, SendMediaRequest, EditMessageRequest, DeleteMessagesRequest, ImportChatInviteRequest, GetFullChatRequest, AddChatUserRequest, DeleteChatUserRequest, CreateChatRequest, DeleteHistoryRequest
 from telethon.tl.functions.account import UpdateStatusRequest, GetAuthorizationsRequest, UpdateProfileRequest, UpdateUsernameRequest
@@ -35,13 +39,42 @@ class TelethonSession(Session):
         self.session_user_id = sid
 
     @staticmethod
-    def try_load_or_create_new(session_user_id, persistence_path=None):
-        sid = session_user_id
-        s = Session.try_load_or_create_new(path.join(persistence_path, session_user_id))
-        s.session_user_id = sid
-        s.persistence_path = persistence_path
-        s.save = TelethonSession.save
-        return s
+    def try_load_or_create(session_user_id, persistence_path):
+        """Loads a saved session_user_id.session or creates a new one.
+           If session_user_id=None, later .save()'s will have no effect.
+        """
+        if session_user_id is None:
+            return TelethonSession(None)
+        else:
+            path = os.path.join(persistence_path, '{}.session'.format(session_user_id))
+            result = TelethonSession(session_user_id)
+            result.persistence_path = persistence_path
+
+            if not isfile(path):
+                return result
+
+            try:
+                with open(path, 'r') as file:
+                    data = json.load(file)
+                    result.port = data.get('port', result.port)
+                    result.salt = data.get('salt', result.salt)
+                    result.layer = data.get('layer', result.layer)
+                    result.server_address = \
+                        data.get('server_address', result.server_address)
+
+                    # FIXME We need to import the AuthKey here or otherwise
+                    # we get cyclic dependencies.
+                    from telethon.crypto.auth_key import AuthKey
+                    if data.get('auth_key_data', None) is not None:
+                        key = b64decode(data['auth_key_data'])
+                        result.auth_key = AuthKey(data=key)
+
+                    result.entities = EntityDatabase(data.get('entities', []))
+
+            except (json.decoder.JSONDecodeError, UnicodeDecodeError):
+                pass
+
+            return result
 
 
 class XMPPTelegram(ComponentXMPP):
@@ -568,7 +601,7 @@ class XMPPTelegram(ComponentXMPP):
         :param phone:
         :return:
         """
-        session = TelethonSession.try_load_or_create_new('a_'+phone, self.config['persistence_path'])
+        session = TelethonSession.try_load_or_create('a_'+phone, self.config['persistence_path'])
         client = TelegramGateClient(session, int(self.config['tg_api_id']), self.config['tg_api_hash'], self, jid, phone)
         if 'tg_server_ip' in self.config and 'tg_server_dc' in self.config and 'tg_server_port' in self.config:
             client.session.set_dc(self.config['tg_server_dc'], self.config['tg_server_ip'], self.config['tg_server_port'])
