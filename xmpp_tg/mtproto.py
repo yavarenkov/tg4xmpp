@@ -52,7 +52,6 @@ class TelegramGateClient(TelegramClient):
         self._message_cache_supergroups = dict()
         
         self._del_pts = 0
-        self.xmpp_message_ids = cachetools.TTLCache(maxsize=256000, ttl=24 * 60 * 60)
         
 
     def xmpp_update_handler(self, obj):
@@ -205,10 +204,10 @@ class TelegramGateClient(TelegramClient):
         if replace_id:
             msg['replace']['id'] = replace_id
 
-        msg.send()
-
         if tg_msg:
-            self.xmpp_message_ids[self.tg_msg_uid(tg_msg)] = msg['id']
+            msg['id'] = self.tg_msg_uid(tg_msg)
+
+        msg.send()
 
     def generate_media_link(self, media):
         """

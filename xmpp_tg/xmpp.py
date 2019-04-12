@@ -102,7 +102,7 @@ class XMPPTelegram(ComponentXMPP):
         self.tg_dialogs = dict()
         self.contact_list = dict()
 
-        self.tg_message_ids = cachetools.TTLCache(maxsize=256000, ttl=24 * 60 * 60)
+        self.tg_message_ids = cachetools.TTLCache(maxsize=256000, ttl=24 * 60 * 60)  # tracks xmpp client msg ids to sent tg_msg_ids
         self.db_connection = self.init_database()
 
         self.register_plugin('xep_0030')  # Service discovery
@@ -198,9 +198,9 @@ class XMPPTelegram(ComponentXMPP):
                         result = None
 
                         if iq['replace']['id'] in self.tg_message_ids:
-                            tg_id, tg_old_msg_id = map(int, self.tg_message_ids[iq['replace']['id']].split('_', maxsplit=1))
+                            tg_old_msg_id = self.tg_message_ids[iq['replace']['id']]
                             self.tg_connections[jid].invoke(EditMessageRequest(tg_peer, tg_old_msg_id, message=msg))
-                            self.tg_message_ids[iq['id']] = '%d_%d' % (tg_id, tg_old_msg_id)
+                            self.tg_message_ids[iq['id']] = tg_old_msg_id
                             return
                         
                         # detect media
@@ -220,8 +220,8 @@ class XMPPTelegram(ComponentXMPP):
                         # find sent message id and save it
                         if result and hasattr(result, 'id'):  # update id 
                             msg_id = result.id
-                            self.tg_dialogs[jid]['messages'][tg_id] = {'id': msg_id, 'body': msg}
-                            self.tg_message_ids[iq['id']] = '%d_%d' % (tg_id, msg_id)
+                            self.tg_dialogs[jid]['messages'][tg_peer.user_id] = {'id': msg_id, 'body': msg}
+                            self.tg_message_ids[iq['id']] = msg_id
                             #self.send_message(mto=iq['from'], mfrom=iq['to'], mtype='chat', mbody='[Your MID:{}]'.format(msg_id))
 
 
