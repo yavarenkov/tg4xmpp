@@ -52,7 +52,13 @@ class TelegramGateClient(TelegramClient):
         self._message_cache_supergroups = dict()
         
         self._del_pts = 0
-        
+
+    def mark_as_read(self, peer, message_id):
+        read_cls = ReadHistoryRequest
+        if isinstance(peer, InputPeerChannel):  # is_supergroup
+            read_cls = ReadHistoryChannel
+
+        self.invoke(read_cls(peer, message_id))
 
     def xmpp_update_handler(self, obj):
        
@@ -81,18 +87,14 @@ class TelegramGateClient(TelegramClient):
                fwd_from = self._process_forward_msg(obj) if obj.fwd_from else '' # process forward messages 
                self.gate_send_message( mfrom='u' + str(obj.user_id), mbody = '{}{}'.format(fwd_from, obj.message), tg_msg=obj)
                usr = self._get_user_information(obj.user_id) # get peer information
-               self.invoke(ReadHistoryRequest( InputPeerUser(usr.id, usr.access_hash), obj.id )) # delivery report
                
             # message from normal group # 
             if type(obj) in [UpdateShortChatMessage] and not obj.out:
                fwd_from = self._process_forward_msg(obj) if obj.fwd_from else '' # process forward messages 
                usr = self._get_user_information(obj.from_id)
                nickname = display_tg_name(usr)
-               
-               # send message 
+
                self.gate_send_message(mfrom='g' + str(obj.chat_id), mbody ='[{}] {}{}'.format(nickname, fwd_from, obj.message), tg_msg=obj)
-               self.invoke(ReadHistoryRequest(InputPeerChat(obj.chat_id), obj.id))
-               
              
             # message from supergroup or media message #
             if type(obj) in [UpdateNewMessage, UpdateNewChannelMessage, UpdateEditMessage, UpdateEditChannelMessage] and not obj.message.out:
@@ -159,12 +161,6 @@ class TelegramGateClient(TelegramClient):
 
                # send message #   
                self.gate_send_message(prefix + str(cid), mbody = '{}{}'.format(fwd_from, msg), replace_id=replace_id )
-               
-               # delivery report
-               if is_supergroup:
-                  self.invoke(ReadHistoryChannel(peer, mid))
-               else:
-                  self.invoke(ReadHistoryRequest(peer, mid))
 
             # Status Updates #
             if type(obj) is UpdateUserStatus: 

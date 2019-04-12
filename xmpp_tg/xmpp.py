@@ -109,6 +109,7 @@ class XMPPTelegram(ComponentXMPP):
         self.register_plugin('xep_0054')  # VCard-temp
         self.register_plugin('xep_0172')  # NickNames
         self.register_plugin('xep_0308')  # Last Message Correction
+        self.register_plugin('xep_0184', {'auto_ack': False, 'auto_request': True})  # Delivery Receipts
 
         self.add_event_handler('message', self.message)
         self.add_event_handler('presence_unsubscribe', self.event_presence_unsub)
@@ -117,6 +118,7 @@ class XMPPTelegram(ComponentXMPP):
         self.add_event_handler('got_online', self.handle_online)
         self.add_event_handler('got_offline', self.handle_offline)
         self.add_event_handler('session_start', self.handle_start)
+        self.add_event_handler('receipt_received', self.handle_receipt_received)
 
         self.plugin['xep_0030'].add_identity(
             category='gateway',
@@ -149,6 +151,26 @@ class XMPPTelegram(ComponentXMPP):
             self.accounts[usr['jid']] = usr
             self.send_presence(pto=usr['jid'], pfrom=self.boundjid.bare, ptype='probe')
 
+    def handle_receipt_received(self, msg):
+        tg_peer = self.tg_peer_from_xmpp_msg(msg)
+        msg_id = int(msg['receipt'].split('_', maxsplit=1)[1])
+        self.tg_connections[msg['from'].bare].mark_as_read(tg_peer, msg_id)
+
+    def tg_peer_from_xmpp_msg(self, iq):
+        jid = iq['from'].bare
+        tg_id = int(iq['to'].node[1:])
+
+        if iq['to'].bare.startswith( ('u', 'b') ):  # normal user
+            tg_peer = InputPeerUser(tg_id, self.tg_dialogs[jid]['users'][tg_id].access_hash)
+        elif iq['to'].bare.startswith('g'):  # generic group
+            tg_peer = InputPeerChat(tg_id)
+        elif iq['to'].bare.startswith( ('s', 'c') ):  # supergroup
+            tg_peer = InputPeerChannel(tg_id, self.tg_dialogs[jid]['supergroups'][tg_id].access_hash)
+        else:
+            raise ValueError('iq[to] is invalid')
+
+        return tg_peer
+
     def message(self, iq):
         """
          Message from XMPP
@@ -172,8 +194,6 @@ class XMPPTelegram(ComponentXMPP):
                     else:
                         self.gate_reply_message(iq, 'Error.')
                 else:  # -- normal message --
-                    tg_id = int(iq['to'].node[1:])
-                    tg_peer = None
                     msg = iq['body']
                     reply_mid = None
 
@@ -186,13 +206,9 @@ class XMPPTelegram(ComponentXMPP):
                             reply_mid = int(matched['mid'])
                             msg = '\n'.join(msg_lines[1:])
 
-                    if iq['to'].bare.startswith( ('u', 'b') ):  # normal user
-                        tg_peer = InputPeerUser(tg_id, self.tg_dialogs[jid]['users'][tg_id].access_hash)
-                    elif iq['to'].bare.startswith('g'):  # generic group
-                        tg_peer = InputPeerChat(tg_id)
-                    elif iq['to'].bare.startswith( ('s', 'c') ):  # supergroup
-                        tg_peer = InputPeerChannel(tg_id, self.tg_dialogs[jid]['supergroups'][tg_id].access_hash)
-                        
+                    tg_peer_id = int(iq['to'].node[1:])
+                    tg_peer = self.tg_peer_from_xmpp_msg(iq)
+
                     # peer OK. 
                     if tg_peer:
                         result = None
@@ -220,7 +236,7 @@ class XMPPTelegram(ComponentXMPP):
                         # find sent message id and save it
                         if result and hasattr(result, 'id'):  # update id 
                             msg_id = result.id
-                            self.tg_dialogs[jid]['messages'][tg_peer.user_id] = {'id': msg_id, 'body': msg}
+                            self.tg_dialogs[jid]['messages'][tg_peer_id] = {'id': msg_id, 'body': msg}
                             self.tg_message_ids[iq['id']] = msg_id
                             #self.send_message(mto=iq['from'], mfrom=iq['to'], mtype='chat', mbody='[Your MID:{}]'.format(msg_id))
 
