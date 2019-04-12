@@ -238,6 +238,7 @@ class XMPPTelegram(ComponentXMPP):
                             msg_id = result.id
                             self.tg_dialogs[jid]['messages'][tg_peer_id] = {'id': msg_id, 'body': msg}
                             self.tg_message_ids[iq['id']] = msg_id
+                            self.tg_connections[jid].xmpp_message_ids['%d_%d' % (tg_peer_id, msg_id)] = iq['id']
                             #self.send_message(mto=iq['from'], mfrom=iq['to'], mtype='chat', mbody='[Your MID:{}]'.format(msg_id))
 
 

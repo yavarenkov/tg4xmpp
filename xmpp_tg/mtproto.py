@@ -2,9 +2,9 @@ import cachetools as cachetools
 from telethon import TelegramClient
 from telethon.utils import get_extension
 from telethon.tl.types import UpdateShortMessage, UpdateShortChatMessage, UpdateEditMessage, UpdateDeleteMessages, \
-                              UpdateNewMessage, UpdateUserStatus, UpdateShort, Updates, UpdateNewChannelMessage,\
-                              UpdateChannelTooLong, UpdateDeleteChannelMessages, UpdateEditChannelMessage,\
-                              UpdateUserName
+    UpdateNewMessage, UpdateUserStatus, UpdateShort, Updates, UpdateNewChannelMessage, \
+    UpdateChannelTooLong, UpdateDeleteChannelMessages, UpdateEditChannelMessage, \
+    UpdateUserName, UpdateReadHistoryOutbox, UpdateReadHistoryInbox
 from telethon.tl.types import InputPeerChat, InputPeerUser, InputPeerChannel, InputUser
 from telethon.tl.types import MessageMediaDocument, MessageMediaPhoto, MessageMediaUnsupported, MessageMediaContact,\
                               MessageMediaGeo, MessageMediaEmpty, MessageMediaVenue
@@ -39,6 +39,8 @@ class TelegramGateClient(TelegramClient):
         self.xmpp_gate = xmpp_gate
         self.jid = jid
         self.phone = phone
+
+        self.xmpp_message_ids = cachetools.TTLCache(maxsize=256000, ttl=24 * 60 * 60)
 
         self._media_queue = queue.Queue()
         self._media_thread = threading.Thread(name='MediaDownloaderThread', target=self.media_thread_downloader)
@@ -86,7 +88,6 @@ class TelegramGateClient(TelegramClient):
 
                fwd_from = self._process_forward_msg(obj) if obj.fwd_from else '' # process forward messages 
                self.gate_send_message( mfrom='u' + str(obj.user_id), mbody = '{}{}'.format(fwd_from, obj.message), tg_msg=obj)
-               usr = self._get_user_information(obj.user_id) # get peer information
                
             # message from normal group # 
             if type(obj) in [UpdateShortChatMessage] and not obj.out:
@@ -175,7 +176,25 @@ class TelegramGateClient(TelegramClient):
                else:
                   pass
 
-               
+            if isinstance(obj, UpdateReadHistoryOutbox):
+                if isinstance(obj.peer, PeerUser):
+                    recipient_id = obj.peer.user_id
+                    prefix = 'u'
+                    if self._get_user_information(obj.peer.user_id).bot:
+                        prefix = 'b'
+                elif isinstance(obj.peer, PeerChat):
+                    recipient_id = obj.peer.chat_id
+                    prefix = 'g'
+                elif isinstance(obj.peer, PeerChannel):
+                    recipient_id = obj.peer.channel_id
+                    prefix = 's'
+                else:
+                    raise ValueError('unknown peer type for message receipt', type(obj.peer))
+
+                xmpp_msg_id = self.xmpp_message_ids.get('%d_%d' % (recipient_id, obj.max_id))
+                if xmpp_msg_id:
+                    self.gate_send_message(prefix + str(recipient_id), mbody=None, receipt=xmpp_msg_id)
+
         except Exception:
             print('Exception occurs!')
             print(traceback.format_exc())
@@ -190,7 +209,7 @@ class TelegramGateClient(TelegramClient):
 
         return '%d_%d' % (from_id, tg_msg.id)
 
-    def gate_send_message(self, mfrom, mbody, replace_id=None, tg_msg=None):
+    def gate_send_message(self, mfrom, mbody, replace_id=None, receipt=None, tg_msg=None):
         tg_from = int(mfrom[1:]) 
         if not tg_from in self.xmpp_gate.tg_dialogs[self.jid]['users'] and not tg_from in self.xmpp_gate.tg_dialogs[self.jid]['groups'] and not tg_from in self.xmpp_gate.tg_dialogs[self.jid]['supergroups']: # new contact appeared
            self.xmpp_gate.tg_process_dialogs( self.jid )
@@ -202,6 +221,9 @@ class TelegramGateClient(TelegramClient):
 
         if tg_msg:
             msg['id'] = self.tg_msg_uid(tg_msg)
+
+        if receipt:
+            msg['receipt'] = receipt
 
         msg.send()
 
