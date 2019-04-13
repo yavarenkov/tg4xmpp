@@ -684,6 +684,7 @@ class XMPPTelegram(ComponentXMPP):
        
        for jid, nick in contacts.items():
                presence = Presence()
+               presence.xml.tag = 'presence'
                presence['from'] = jid
                presence['to'] = tojid
                presence['type'] = 'subscribe'
