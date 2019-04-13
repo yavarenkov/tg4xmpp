@@ -3,9 +3,7 @@ import os
 
 CONFIG = {
     'title': 'Telegram',
-
     'debug': bool(int(os.getenv('DEBUG', 0))),
-    'logfile': '/dev/null',
 
     'jid': os.getenv('JID', 'tlgrm.localhost'),
     'secret': os.getenv('SECRET', 'secret'),

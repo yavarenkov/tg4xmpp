@@ -28,6 +28,9 @@ from xmpp_tg.utils import localtime, display_tg_name
 
 import xmpp_tg.monkey 
 import traceback
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class TelegramGateClient(TelegramClient):
@@ -196,8 +199,7 @@ class TelegramGateClient(TelegramClient):
                     self.gate_send_message(prefix + str(recipient_id), mbody=None, receipt=xmpp_msg_id)
 
         except Exception:
-            print('Exception occurs!')
-            print(traceback.format_exc())
+            logger.exception('Exception while receiving tg message')
 
     def tg_msg_uid(self, tg_msg):
         if hasattr(tg_msg, 'user_id'):
@@ -444,16 +446,16 @@ class TelegramGateClient(TelegramClient):
                 if self._media_queue.empty():  # queue is empty
                     time.sleep(0.1)
                 else:  # queue is not empty
-                    print('MTD ::: Queue is not empty. Downloading...')
+                    logger.debug('MTD ::: Queue is not empty. Downloading...')
                     media = self._media_queue.get()
                     file_path = self.xmpp_gate.config['media_store_path'] + media['file']
                     if os.path.isfile(file_path):
-                        print('MTD ::: File already exists')
+                        logger.info('MTD ::: File already exists')
                     else:
                         self.download_media(media['media'], file_path, False)
-                        print('MTD ::: Media downloaded')
+                        logger.debug('MTD ::: Media downloaded')
             except Exception:
-                print(traceback.format_exc())
+                logger.exception('media_thread_downloader failed, restarting...')
                 
     def status_updater_thread(self):
        

@@ -30,7 +30,9 @@ from telethon.errors import SessionPasswordNeededError
 from xmpp_tg.mtproto import TelegramGateClient
 from xmpp_tg.utils import var_dump, display_tg_name, get_contact_jid, localtime
 import xmpp_tg.monkey  # monkeypatch
+import logging
 
+logger = logging.getLogger(__name__)
 
 class TelethonSession(Session):
     def save(self):
@@ -227,7 +229,7 @@ class XMPPTelegram(ComponentXMPP):
                             try:
                                 result = self.tg_connections[jid].invoke(SendMediaRequest(tg_peer, media, message, random_id = generate_random_long(), reply_to_msg_id = reply_mid))
                             except Exception:
-                                print('Media upload failed.')
+                                logger.exception('Media upload failed.')
                                 
                         # media send failed. #
                         if not result:
@@ -332,7 +334,7 @@ class XMPPTelegram(ComponentXMPP):
         """
         
         for jid in self.tg_connections:
-            print('Disconnecting: %s' % jid)
+            logger.info('Disconnecting: %s' % jid)
             self.tg_connections[jid].invoke(UpdateStatusRequest(offline=True))
             self.tg_connections[jid].disconnect()
             for contact_jid, contact_nickname in self.contact_list[jid].items():
@@ -690,8 +692,7 @@ class XMPPTelegram(ComponentXMPP):
           
 
     def tg_process_dialogs(self, jid, sync_roster = True):
-       
-        print('Processing dialogs...')
+        logger.info('Processing dialogs...')
        
         # dialogs dictonaries
         self.tg_dialogs[jid] = dict()
