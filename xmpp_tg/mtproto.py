@@ -164,7 +164,7 @@ class TelegramGateClient(TelegramClient):
                   replace_id = self.xmpp_message_ids.get(self.tg_msg_uid(obj.message))
 
                # send message #   
-               self.gate_send_message(prefix + str(cid), mbody = '{}{}'.format(fwd_from, msg), replace_id=replace_id )
+               self.gate_send_message(prefix + str(cid), mbody='{}{}'.format(fwd_from, msg), replace_id=replace_id, tg_msg=obj.message)
 
             # Status Updates #
             if type(obj) is UpdateUserStatus: 
@@ -362,7 +362,7 @@ class TelegramGateClient(TelegramClient):
 
             self._media_queue.put({'media': media, 'file': g_link['name']})
 
-            if hasattr(media, 'caption'):  # caption
+            if hasattr(media, 'caption') and isinstance(media.caption, str):  # caption
                 msg = '{} {}'.format(media.caption, msg)
 
         elif type(media) is MessageMediaContact:  # contact
