@@ -273,6 +273,14 @@ class XMPPTelegram(ComponentXMPP):
             # self.send_presence(pto=presence['from'], pfrom=presence['to'])
             pass
 
+    def send_presence(self, pshow=None, pstatus=None, ppriority=None,
+                      pto=None, pfrom=None, ptype=None, pnick=None):
+        p = self.make_presence(pshow, pstatus, ppriority, pto,
+                           ptype, pfrom, pnick)
+
+        p.xml.tag = 'presence'
+        p.send()
+
     def handle_online(self, event, sync_roster = True):
         """
         Gateway's subscriber comes online
