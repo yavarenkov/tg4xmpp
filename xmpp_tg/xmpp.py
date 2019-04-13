@@ -903,6 +903,6 @@ class XMPPTelegram(ComponentXMPP):
         conn = sqlite3.connect(self.config['db_connect'], isolation_level=None, check_same_thread=False)
         conn.row_factory = dict_factory
 
-        conn.execute("CREATE TABLE IF NOT EXISTS accounts(jid VARCHAR(255), tg_phone VARCHAR(25), use_roster_exchange BOOLEAN default false, keep_online BOOLEAN default false, status_update_interval INTEGER default 30, status_xa_interval INTEGER default 24, enable_avatars BOOLEAN default false)")
+        conn.execute("CREATE TABLE IF NOT EXISTS accounts(jid VARCHAR(255), tg_phone VARCHAR(25), use_roster_exchange BOOLEAN default true, keep_online BOOLEAN default false, status_update_interval INTEGER default 30, status_xa_interval INTEGER default 24, enable_avatars BOOLEAN default false)")
 
         return conn
