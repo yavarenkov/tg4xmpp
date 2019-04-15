@@ -27,6 +27,7 @@ from telethon.tl.types.messages import Dialogs, DialogsSlice
 from telethon.helpers import generate_random_long
 from telethon.errors import SessionPasswordNeededError
 
+from xmpp_tg import xep_0077
 from xmpp_tg.mtproto import TelegramGateClient
 from xmpp_tg.utils import var_dump, display_tg_name, get_contact_jid, localtime
 import xmpp_tg.monkey  # monkeypatch
@@ -112,6 +113,7 @@ class XMPPTelegram(ComponentXMPP):
         self.register_plugin('xep_0172')  # NickNames
         self.register_plugin('xep_0308')  # Last Message Correction
         self.register_plugin('xep_0184', {'auto_ack': False, 'auto_request': True})  # Delivery Receipts
+        self.register_plugin('xep_0077', module=xep_0077)  # In-Band Registration (tg-specific)
 
         self.add_event_handler('message', self.message)
         self.add_event_handler('presence_unsubscribe', self.event_presence_unsub)
@@ -394,16 +396,16 @@ class XMPPTelegram(ComponentXMPP):
                 self.gate_reply_message(iq, 'You are already authenticated in Telegram.')
             else:
                 # remove old sessions for this JID #
-                self.db_connection.execute("DELETE from accounts where jid = ?", (jid, ) )
-                self.tg_connections[jid].send_code_request(parsed[1])
+                self.tg_login(jid, parsed[1])
                 self.gate_reply_message(iq, 'Gate is connected. Telegram should send SMS message to you.')
                 self.gate_reply_message(iq, 'Please enter one-time code via !code 12345.')
         elif parsed[0] in ['!code', '!password']:  # --------------------------------------------------
             if not self.tg_connections[jid].is_user_authorized():
+                authorized = False
                 if parsed[0] == '!code':
                     try:
                         self.gate_reply_message(iq, 'Trying authenticate...')
-                        self.tg_connections[jid].sign_in(self.tg_phones[jid], parsed[1])
+                        authorized = self.tg_authenticate(jid, code=parsed[1])
                     except SessionPasswordNeededError:
                         self.gate_reply_message(iq, 'Two-factor authentication detected.')
                         self.gate_reply_message(iq, 'Please enter your password via !password abc123.')
@@ -411,14 +413,11 @@ class XMPPTelegram(ComponentXMPP):
 
                 if parsed[0] == '!password':
                     self.gate_reply_message(iq, 'Checking password...')
-                    self.tg_connections[jid].sign_in(password=parsed[1])
+                    authorized = self.tg_authenticate(jid, password=parsed[1])
 
-                if self.tg_connections[jid].is_user_authorized():
+                if authorized:
                     self.send_presence(pto=jid, pfrom=self.boundjid.bare, ptype='online', pstatus='connected')
                     self.gate_reply_message(iq, 'Authentication successful. Initiating Telegram...')
-                    self.db_connection.execute("INSERT INTO accounts(jid, tg_phone) VALUES(?, ?)", (jid, self.tg_phones[jid],))
-                    self.accounts[jid] = self.db_connection.execute("SELECT * FROM accounts where jid = ?", (jid,) ).fetchone()
-                    self.init_tg(jid)
 
                 else:
                     self.gate_reply_message(iq, 'Authentication failed.')
@@ -437,8 +436,7 @@ class XMPPTelegram(ComponentXMPP):
             self.tg_process_dialogs(jid)
             self.gate_reply_message(iq, 'Dialogs reloaded.')
         elif parsed[0] == '!logout':  # --------------------------------------------------
-            self.tg_connections[jid].log_out()
-            self.db_connection.execute("DELETE FROM accounts WHERE jid = ?", (jid,))
+            self.tg_logout(jid)
             self.gate_reply_message(iq, 'Your Telegram session was deleted')
         elif parsed[0] == '!add': # add user
             result = self.tg_connections[jid].get_entity(parsed[1])
@@ -505,6 +503,40 @@ class XMPPTelegram(ComponentXMPP):
             
         else:  # --------------------------------------------------
             self.gate_reply_message(iq, 'Unknown command. Try !help for list all commands.')
+
+    def tg_login(self, jid, phone):
+        self.tg_logout(jid)
+        self.spawn_tg_client(jid, phone)
+        self.tg_connections[jid].send_code_request(phone)
+
+    def tg_authenticate(self, jid, code=None, password=None):
+        self.tg_connections[jid].sign_in(self.tg_phones[jid], code=code, password=password)
+
+        self.db_connection.execute("INSERT INTO accounts(jid, tg_phone) VALUES(?, ?)", (jid, self.tg_phones[jid],))
+        self.accounts[jid] = self.db_connection.execute("SELECT * FROM accounts where jid = ?", (jid,) ).fetchone()
+        self.init_tg(jid)
+        
+        return self.tg_connections[jid].is_user_authorized()
+
+    def tg_logout(self, jid):
+        self.db_connection.execute("DELETE FROM accounts WHERE jid = ?", (jid,))
+
+        if jid in self.accounts:
+            del self.accounts[jid]
+
+        if jid in self.tg_connections:
+            #self.tg_connections[jid].log_out()
+            del self.tg_connections[jid]
+
+    def tg_user(self, jid):
+        if not jid in self.tg_connections:
+            if jid in self.accounts:
+                self.spawn_tg_client(jid, self.accounts[jid].tg_phone)
+
+        if jid in self.tg_connections and self.tg_connections[jid].is_user_authorized():
+            return self.tg_connections[jid]
+
+        return None
 
     def process_chat_user_command(self, iq):
         parsed = iq['body'].split(' ')
