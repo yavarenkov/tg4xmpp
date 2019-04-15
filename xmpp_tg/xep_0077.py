@@ -81,12 +81,12 @@ class xep_0077(BasePlugin):
         #     return self.make_error(self.make_form(iq, instructions='instructions', form_data=form).reply(clear=False), '406', 'modify', 'not-acceptable', "forms are cool\n" * 20, clear=False).send()
 
         try:
-            if form.get('misc') and self.xmpp.tg_authenticate(jid, password=form['misc']):
+            if form['misc'] and self.xmpp.tg_authenticate(jid, password=form['misc']):
                 form.addField('registered')
-            elif form.get('password') and self.xmpp.tg_authenticate(jid, code=form['password']):
+            elif form['password'] and self.xmpp.tg_authenticate(jid, code=form['password']):
                 form.addField('registered')
 
-            elif form.get('phone') and not self.xmpp.tg_user(jid):
+            elif form['phone']:
                 try:
                     self.xmpp.tg_login(jid, form['phone'])
                 except PhoneNumberInvalidError:
@@ -98,7 +98,7 @@ class xep_0077(BasePlugin):
                 return self.make_error(iq, '406', 'modify', 'not-acceptable',
                                        "Additional information is required", clear=False).send()
             else:
-                 return self.make_error(iq, 'cancel', 'undefined-condition', 'registration data incorrect').send()
+                 return self.make_error(iq, '500', 'cancel', 'feature-not-implemented', 'unknown registration fields').send()
 
         except SessionPasswordNeededError:
             form.addField('misc')
@@ -129,8 +129,7 @@ class xep_0077(BasePlugin):
 
     def make_form(self, request, registered=False, instructions=None, form_data=None):
         reg = request['register']
-        if registered:
-            reg.setRegistered()
+        reg.setRegistered(registered)
 
         if instructions:
             reg['instructions'] = instructions
