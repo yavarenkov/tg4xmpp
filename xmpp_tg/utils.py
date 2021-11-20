@@ -1,6 +1,5 @@
 import types
 import time
-import pytz
 from datetime import datetime
 
 
@@ -36,15 +35,6 @@ def get_contact_jid(peer, gatejid):
         return 'b' + str(peer.id) + '@' + gatejid
     else: # what a fuck is this? 
         return None
-
-def localtime(utc_dt):
-    if time.daylight:
-        offsetHour = time.altzone / 3600
-    else:
-        offsetHour = time.timezone / 3600
-    local_tz = pytz.timezone('Etc/GMT%+d' % offsetHour)
-    local_dt = utc_dt.replace(tzinfo = pytz.utc).astimezone(local_tz)
-    return local_tz.normalize(local_dt)
 
 def var_dump(obj, depth=7, l=""):
     # fall back to repr

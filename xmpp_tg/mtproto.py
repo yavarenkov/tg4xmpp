@@ -24,7 +24,7 @@ from telethon.tl.functions.updates import GetDifferenceRequest
 from telethon.tl.functions.contacts import ResolveUsernameRequest
 
 import os, threading, queue, hashlib, time, datetime
-from xmpp_tg.utils import localtime, display_tg_name
+from xmpp_tg.utils import display_tg_name
 
 import xmpp_tg.monkey 
 import traceback
@@ -173,7 +173,7 @@ class TelegramGateClient(TelegramClient):
                   self._status_updates[str(obj.user_id)] = { 'status': None, 'message':  'Online' }
                elif type(obj.status) is UserStatusOffline:
                   status = 'away' if datetime.datetime.utcnow() - obj.status.was_online < datetime.timedelta(hours = self.xmpp_gate.accounts[self.jid]['status_xa_interval'] ) else 'xa'
-                  self._status_updates[str(obj.user_id)] = { 'status': status, 'message':  localtime(obj.status.was_online).strftime('Last seen at %H:%M %d/%m/%Y') }
+                  self._status_updates[str(obj.user_id)] = { 'status': status, 'message':  obj.status.was_online.strftime('Last seen at %H:%M %d/%m/%Y') }
                elif type(obj.status) is UserStatusRecently:
                   self._status_updates[str(obj.user_id)] = { 'status': 'dnd', 'message':  'Last seen recently' }
                else:

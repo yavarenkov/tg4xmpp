@@ -29,7 +29,7 @@ from telethon.errors import SessionPasswordNeededError
 
 from xmpp_tg import xep_0077
 from xmpp_tg.mtproto import TelegramGateClient
-from xmpp_tg.utils import var_dump, display_tg_name, get_contact_jid, localtime
+from xmpp_tg.utils import var_dump, display_tg_name, get_contact_jid
 import xmpp_tg.monkey  # monkeypatch
 import logging
 
@@ -808,7 +808,7 @@ class XMPPTelegram(ComponentXMPP):
                             self.send_presence(pto=jid, pfrom=u_jid, pshow='dnd', pstatus='Last seen recently')
                         elif type(usr.status) is UserStatusOffline:
                             phow = 'away' if datetime.datetime.utcnow() - usr.status.was_online < datetime.timedelta(hours = self.accounts[jid]['status_xa_interval'] ) else 'xa' 
-                            self.send_presence(pto=jid, pfrom=u_jid, pshow=phow, pstatus=localtime(usr.status.was_online).strftime('Last seen at %H:%M %d/%m/%Y') )
+                            self.send_presence(pto=jid, pfrom=u_jid, pshow=phow, pstatus=usr.status.was_online.strftime('Last seen at %H:%M %d/%m/%Y') )
                         else:
                             self.send_presence(pto=jid, pfrom=u_jid, ptype='unavailable', pstatus='Last seen a long time ago')
 
