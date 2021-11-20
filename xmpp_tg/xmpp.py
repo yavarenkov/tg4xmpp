@@ -227,7 +227,7 @@ class XMPPTelegram(ComponentXMPP):
                         if msg.startswith('http') and re.match(r'(?:http\:|https\:)?\/\/.*\.(?:' + self.config['media_external_formats'] + ')', msg):
                             urls = re.findall(r'(?:http\:|https\:)?\/\/.*\.(?:' + self.config['media_external_formats'] + ')', msg)
                             message = msg.replace(urls[0], '')
-                            media = InputMediaPhotoExternal(urls[0])
+                            media = InputMediaPhotoExternal(urls[0], '')
                             try:
                                 result = self.tg_connections[jid].invoke(SendMediaRequest(tg_peer, media, message, random_id = generate_random_long(), reply_to_msg_id = reply_mid))
                             except Exception:
