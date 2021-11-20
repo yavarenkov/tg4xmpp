@@ -30,18 +30,18 @@ def patched_stop_workers(self):
     Waits for all the worker threads to stop.
     """
     # Put dummy ``None`` objects so that they don't need to timeout.
-    n = self._workers
-    self._workers = None
-    if n:
-        with self._updates_lock:
-            for _ in range(n):
-                self._updates.put(None)
-
-    for t in self._worker_threads:
-        t.join()
-
-    self._worker_threads.clear()
-    self._workers = n 
+#    n = self._workers
+#    self._workers = None
+#    if n:
+#        with self._updates_lock:
+#            for _ in range(n):
+#                self._updates.put(None)
+#
+#    for t in self._worker_threads:
+#        t.join()
+#
+#    self._worker_threads.clear()
+#    self._workers = n
 
 def patched_get_info(self, jid=None, node=None, local=None, cached=None, **kwargs):
 
