@@ -511,6 +511,10 @@ class XMPPTelegram(ComponentXMPP):
 
     def tg_authenticate(self, jid, code=None, password=None):
         self.tg_connections[jid].sign_in(self.tg_phones[jid], code=code, password=password)
+
+        self.db_connection.execute("INSERT INTO accounts(jid, tg_phone) VALUES(?, ?)", (jid, self.tg_phones[jid],))
+        self.accounts[jid] = self.db_connection.execute("SELECT * FROM accounts where jid = ?", (jid,) ).fetchone()
+
         self.init_tg(jid)
         
         return self.tg_connections[jid].is_user_authorized()
